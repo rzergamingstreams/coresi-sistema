@@ -161,4 +161,47 @@
     document.getElementById('user-registration-section').classList.toggle('hidden', !isLoggedIn);
     
     if (isLoggedIn) {
-      const users = getUsers().filter(u => u.rol
+      const users = getUsers().filter(u => u.rol !== 'Super Admin');
+      document.getElementById('usuarios-body').innerHTML = users.map(u => `<div class="p-2 border rounded bg-gray-50 flex justify-between items-center text-sm"><span>${u.nombre} (${u.usuario}) - ${u.rol}</span></div>`).join('') || '<p class="text-sm text-gray-500">Sin usuarios registrados.</p>';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    await window.dataSdk.init(dataHandler);
+    
+    const openModalFn = () => openModal('panel-modal');
+    document.getElementById('open-panel-btn').addEventListener('click', openModalFn);
+    document.getElementById('open-panel-btn-2').addEventListener('click', openModalFn);
+    document.getElementById('close-panel-btn').addEventListener('click', () => closeModal('panel-modal'));
+    
+    document.getElementById('setup-super-admin-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById('setup-admin-nombre').value.trim();
+      const pin = document.getElementById('setup-admin-pin').value;
+      if (!/^\d{8}$/.test(pin)) { showMsg(document.getElementById('setup-admin-msg'), 'El PIN debe ser de 8 dígitos', 'error'); return; }
+      const hash = await hashPin(pin);
+      const res = await window.dataSdk.create({ record_type: 'usuario', nombre, usuario: nombre, pin_hash: hash, rol: 'Super Admin', fecha_registro: new Date().toISOString().split('T')[0] });
+      if (res.isOk) { showMsg(document.getElementById('setup-admin-msg'), 'Super Admin registrado con éxito', 'ok'); currentAdminSession = nombre; renderPanelState(); }
+    });
+
+    document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pin = document.getElementById('admin-login-pin').value;
+      const sa = getSuperAdmin();
+      if (!sa) return;
+      const hash = await hashPin(pin);
+      if (sa.pin_hash !== hash) { showMsg(document.getElementById('admin-login-msg'), 'PIN incorrecto', 'error'); return; }
+      currentAdminSession = sa.nombre;
+      renderPanelState();
+    });
+
+    document.getElementById('logout-admin-btn').addEventListener('click', () => {
+      currentAdminSession = null;
+      renderPanelState();
+    });
+
+    lucide.createIcons();
+  });
+  </script>
+ </body>
+</html>

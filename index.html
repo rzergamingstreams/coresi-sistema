@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ferreterias Coresi Insider</title>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet">
+  <style>
+  body{font-family:'DM Sans',sans-serif}
+  .glass-btn{backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.2)}
+  .tab-active{color:#1d4ed8;border-bottom:3px solid #1d4ed8;font-weight:700}
+  </style>
+  <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.577.0/dist/umd/lucide.min.js" type="text/javascript"></script>
+ </head>
+ <body class="min-h-screen w-full bg-slate-50">
+  <header class="w-full bg-white shadow-md sticky top-0 z-50">
+   <div class="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
+    <div class="font-bold text-blue-900 text-lg">Ferreterías Coresi Insider</div>
+    <button id="open-panel-btn" class="bg-green-700 hover:bg-green-800 text-white font-bold px-4 py-2 rounded-lg text-sm transition">Panel FCI</button>
+   </div>
+  </header>
+  <main class="max-w-6xl mx-auto px-4 py-12">
+   <div class="bg-white rounded-2xl shadow-xl p-8 text-center">
+    <h1 class="text-3xl font-extrabold text-blue-900 mb-4">Sistema de Registro y Cobranza</h1>
+    <p class="text-gray-600 mb-6">Tu base de datos está conectada de forma segura a Google Sheets.</p>
+    <button id="open-panel-btn-2" class="bg-blue-700 hover:bg-blue-800 text-white font-bold px-6 py-3 rounded-xl shadow transition">Abrir Panel de Control</button>
+   </div>
+  </main>
+
+  <!-- Panel Modal -->
+  <div id="panel-modal" class="fixed inset-0 z-[100] hidden bg-black/60 items-center justify-center p-4">
+   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+    <div class="flex items-center justify-between border-b pb-3 mb-4">
+     <h2 class="font-bold text-xl text-blue-900">Panel de Administración</h2>
+     <button id="close-panel-btn" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">×</button>
+    </div>
+    <div id="super-admin-setup" class="p-4 bg-purple-50 rounded-lg border border-purple-200 mb-6">
+     <h4 class="font-bold text-purple-900 mb-3">🔐 Configuración Super Admin</h4>
+     <form id="setup-super-admin-form" class="space-y-3">
+      <div><label class="block mb-1 font-medium text-purple-900 text-sm">Nombre del Super Admin</label><input id="setup-admin-nombre" type="text" required placeholder="Ej: MOGCCORESI" class="w-full border rounded-lg px-3 py-2 outline-none"></div>
+      <div><label class="block mb-1 font-medium text-purple-900 text-sm">PIN (8 dígitos)</label><input id="setup-admin-pin" type="password" required placeholder="00000000" minlength="8" maxlength="8" inputmode="numeric" class="w-full border rounded-lg px-3 py-2 outline-none"></div>
+      <button type="submit" class="w-full py-2.5 rounded-lg font-bold text-white bg-purple-700 hover:bg-purple-800">Registrar Super Admin</button>
+     </form>
+     <div id="setup-admin-msg" class="mt-2 text-center text-sm hidden"></div>
+    </div>
+    <div id="admin-login-section" class="hidden">
+     <div class="p-4 bg-purple-50 rounded-lg border border-purple-200 mb-6">
+      <h4 class="font-bold text-purple-900 mb-3">🔐 Acceso Super Admin</h4>
+      <form id="admin-login-form" class="space-y-3">
+       <div><label class="block mb-1 font-medium text-purple-900 text-sm">PIN del Super Admin</label><input id="admin-login-pin" type="password" required placeholder="00000000" minlength="8" maxlength="8" inputmode="numeric" class="w-full border rounded-lg px-3 py-2 outline-none"></div>
+       <button type="submit" class="w-full py-2.5 rounded-lg font-bold text-white bg-purple-700 hover:bg-purple-800">Iniciar Sesión</button>
+      </form>
+      <div id="admin-login-msg" class="mt-2 text-center text-sm hidden"></div>
+     </div>
+    </div>
+    <div id="user-registration-section" class="hidden">
+     <div class="flex items-center justify-between mb-3"><h4 class="font-bold text-blue-900">Usuarios Registrados</h4><button id="logout-admin-btn" class="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg font-bold">Salir</button></div>
+     <div id="usuarios-body" class="space-y-2"></div>
+    </div>
+   </div>
+  </div>
+
+  <script>
+  // ===== CONECTOR GOOGLE SHEETS =====
+  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwNas7JTntq5AvH0MK6dDscqE0oquuLcRUSCPYUkwySbEwUN8TUYr-HapKQG9Xt5_bbLg/exec";
+
+  window.dataSdk = {
+    _handler: null,
+    async init(handler) {
+      this._handler = handler;
+      await this.refresh();
+      setInterval(() => this.refresh(true), 25000);
+      return { isOk: true };
+    },
+    async refresh(silent = false) {
+      if (!GOOGLE_SCRIPT_URL) return;
+      try {
+        const res = await fetch(GOOGLE_SCRIPT_URL);
+        const json = await res.json();
+        if (json.isOk && Array.isArray(json.data)) {
+          if (this._handler && typeof this._handler.onDataChanged === 'function') {
+            this._handler.onDataChanged(json.data);
+          }
+        }
+      } catch (err) {
+        if (!silent) console.error("Error al sincronizar con Google Sheets:", err);
+      }
+    },
+    async _post(payload) {
+      try {
+        const res = await fetch(GOOGLE_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        return await res.json();
+      } catch (err) {
+        return { isOk: false };
+      }
+    },
+    async create(record) {
+      const newRecord = { ...record, __backendId: record.__backendId || crypto.randomUUID() };
+      allData.push(newRecord);
+      if (this._handler) this._handler.onDataChanged([...allData]);
+      const res = await this._post({ action: 'create', record: newRecord });
+      if (res.isOk) await this.refresh(true);
+      return res;
+    },
+    async update(record) {
+      const idx = allData.findIndex(r => r.__backendId === record.__backendId);
+      if (idx !== -1) {
+        allData[idx] = { ...record };
+        if (this._handler) this._handler.onDataChanged([...allData]);
+      }
+      return await this._post({ action: 'update', record });
+    },
+    async delete(record) {
+      const id = record.__backendId || record;
+      allData = allData.filter(r => r.__backendId !== id);
+      if (this._handler) this._handler.onDataChanged([...allData]);
+      return await this._post({ action: 'delete', id });
+    }
+  };
+
+  let allData = [];
+  let currentAdminSession = null;
+
+  async function hashPin(pin) {
+    const enc = new TextEncoder().encode(pin);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function showMsg(el, text, type) {
+    el.textContent = text;
+    el.className = 'mt-2 text-center text-sm ' + (type === 'error' ? 'text-red-600' : 'text-green-600');
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 4000);
+  }
+
+  function getUsers() { return allData.filter(r => r.record_type === 'usuario'); }
+  function getSuperAdmin() { return getUsers().find(r => r.rol === 'Super Admin'); }
+
+  function openModal(id) { document.getElementById(id).classList.remove('hidden'); document.getElementById(id).style.display = 'flex'; }
+  function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.getElementById(id).style.display = ''; }
+
+  const dataHandler = {
+    onDataChanged(data) {
+      allData = data;
+      renderPanelState();
+    }
+  };
+
+  function renderPanelState() {
+    const sa = getSuperAdmin();
+    const isLoggedIn = currentAdminSession && sa;
+    document.getElementById('super-admin-setup').classList.toggle('hidden', !!sa);
+    document.getElementById('admin-login-section').classList.toggle('hidden', !sa || isLoggedIn);
+    document.getElementById('user-registration-section').classList.toggle('hidden', !isLoggedIn);
+    
+    if (isLoggedIn) {
+      const users = getUsers().filter(u => u.rol
